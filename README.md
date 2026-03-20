@@ -69,7 +69,7 @@ Nous allons préférer le mode non interactif :
 sudo samba-tool domain provision --server-role=dc --use-rfc2307 --dns-backend=SAMBA_INTERNAL --realm=OPENSOURCEINFRA.ATS --domain=OPENSOURCEINFRA --adminpass='P@ssw0rd@'
 ```
 
-![alt text](prov.png)
+![alt text](/assets/img/prov.png)
 
 Définir dans /etc/samba/smb.conf le DNS forwarder dans la section [global] par 8.8.8.8 ou 1.1.1.1 ou encore IP du serveur DNS.
 
@@ -77,7 +77,7 @@ Définir dans /etc/samba/smb.conf le DNS forwarder dans la section [global] par 
 sudo nano /etc/samba/smb.conf
 ```
 
-![alt text](for.png)
+![alt text](/assets/img/for.png)
 
 Pour démarrer Samba au démarrage du serveur :
 
