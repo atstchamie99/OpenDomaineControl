@@ -36,7 +36,7 @@ Installation de Samba DC (dans notre cas, nous travaillerons avec Ubuntu Server 
 sudo apt install samba smbclient winbind libpam-winbind libnss-winbind krb5-kdc libpam-krb5 -y
 ```
 
-Répondre aux questions, valider toutes les questions par Entrée. Nous compléterons ces champs lorsque nous allons promouvoir AD.
+Répondre aux questions, valider toutes les questions par Entrée. Nous compléterons ces champs lorsque nous allons promouvoir AD. Les erreurs affichées sont normales.
 
 ## Configurer Samba comme contrôleur AD
 
@@ -55,7 +55,7 @@ sudo rm -rf /var/lib/samba/*
 sudo rm -rf /etc/samba/smb.conf
 ```
 
-Promouvoir Samba DC :
+Promouvoir Samba DC (nous allons préférer le mode non interactif) :
 
 En mode interactif :
 
@@ -66,12 +66,16 @@ sudo samba-tool domain provision --use-rfc2307 --interactive
 Nous allons préférer le mode non interactif :
 
 ```bash
-samba-tool domain provision --server-role=dc --use-rfc2307 --dns-backend=SAMBA_INTERNAL --realm=OPENSOURCEINFRA.ATS --domain=OPENSOURCEINFRA --adminpass='P@ssw0rd@'
+sudo samba-tool domain provision --server-role=dc --use-rfc2307 --dns-backend=SAMBA_INTERNAL --realm=OPENSOURCEINFRA.ATS --domain=OPENSOURCEINFRA --adminpass='P@ssw0rd@'
 ```
 
 ![alt text](prov.png)
 
 Définir dans /etc/samba/smb.conf le DNS forwarder dans la section [global] par 8.8.8.8 ou 1.1.1.1 ou encore IP du serveur DNS.
+
+```bash
+sudo nano /etc/samba/smb.conf
+```
 
 ![alt text](for.png)
 
@@ -86,6 +90,10 @@ sudo systemctl start samba-ad-dc
 Éditer et désactiver systemd-resolved pour éviter qu'il écrase resolv.conf :
 
 Éditer dans le fichier /etc/resolv.conf :
+
+```bash
+sudo nano /etc/resolv.conf
+```
 
 ```text
 nameserver 192.168.1.93
@@ -103,6 +111,12 @@ sudo systemctl stop systemd-resolved
 sudo cp /var/lib/samba/private/krb5.conf /etc
 ```
 
+Avant de tester, redémarrons samba-ad-dc :
+
+```bash
+sudo systemctl restart samba-ad-dc
+```
+
 Testons la configuration.
 
 L'enregistrement SRV _ldap :
@@ -117,7 +131,11 @@ L'enregistrement de ressource SRV _kerberos basé sur UDP dans le domaine :
 host -t SRV _kerberos._udp.opensourceinfra.ats
 host -t A dcm1.opensourceinfra.ats
 ```
+Puis: 
 
+```bash
+host -t A dcm1.opensourceinfra.ats
+```
 ## Kerberos
 
 ```bash
@@ -163,7 +181,7 @@ Créons un compte utilisateur simple :
 - Créer l'utilisateur en mode interactif :
 
 ```bash
-sudo samba-tool user create username
+sudo samba-tool user create nom_utilisateur
 ```
 
 - Créer avec mot de passe directement :
