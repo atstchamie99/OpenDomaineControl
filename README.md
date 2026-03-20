@@ -1,67 +1,173 @@
 # OpenDomaineControl
 
-Nous allons configure Active Directory et un Controlleur de Domaine sous Ubuntu Server 20 avec Samba Dc.
+Nous allons configurer Active Directory et un Contrôleur de Domaine sous Ubuntu Server 20 avec Samba DC.
 
+Configurer Samba comme contrôleur de domaine est une alternative très sérieuse et logique à celui de Windows Server et son Active Directory, car le Contrôleur de Domaine Samba peut intégrer des clients Windows (7/10/11) comme le ferait si bien celui de Windows Server. D'après le wiki de Samba, il fonctionne au niveau fonctionnel forestier de Windows Server 2008 R2, suffisant pour gérer des entreprises sophistiquées et répond aux exigences strictes de conformité comme le NIST 800-171 par exemple.
 
-Configurer Samba comme COntrolleur de domaine est une alternative très serieuse et logique à celui de Windows server et son Active Directory car le Controleur de Domaine Samba peut integrer des client windows(7/10/11) comme le ferai si bien celui de windows Server. D'apres le wiki de Samba fonctionne au niveau fonctionnel forestier de Windows Server 2008 R2, suffisant pour gérer des entreprises sophistiquées et repond aux exigences strictes de conformité comme le NIST 800-171 par exemple.
+Ce travail est une des sections d'un projet (Lab) OpenSourceInfra.
 
+Le but principal est de concevoir une infrastructure complète et fonctionnelle basée sur des outils open source afin d'offrir une alternative réelle et performante aux outils propriétaires. Le Lab sera régulièrement mis à jour et devra respecter certaines normes, règles et critères de conformité en matière de sécurité afin que cette architecture soit adaptable à un environnement de production.
 
-      Cette travail est 'une des sections d'un projet (Lab) OpenSourceInfra
+## Installation et configuration
 
-Le but principale est de concevoire une infrastructure complete et fonctionel basé sur des outils opensource afin d'offrire une alternative réel et performante au outils propritaire. Le Lab sera mis regulierement mis à jour et devra respecter certaines normes, règles et critères de conformité en matière de sécurité afin que cette architecture soit adaptable a un environement de production.
+### Installation
 
-            Installation et COnfiguration:
+Nous allons configurer premièrement le nom d'hôte, nous allons choisir "dcm1".
 
-      Installation:
+```bash
+sudo hostnamectl set-hostname dcm1
+```
 
-Nous allons configurer premièrement configurer le nom d'hôte nous allons choisir "dcm1"
+Éditer le fichier /etc/hosts, cela n'est pas obligatoire dans l'immédiat. De ce fait, nous allons automatiser cette tâche avec un script et un cron à chaque démarrage du serveur.
 
-            sudo hostnamectl set-hostname dcm1
+```bash
+sudo nano /etc/hosts
+```
 
-Editer le fichier /etc/hosts cela n'est pas obligatoire dans l'immediat de ce fais nous allons automatiser cette tache avec un scrit et un cron a chaque demarage du serveur.
+Entrer la ligne suivante :
 
-            sudo nano /etc/hosts
+```text
+ip_du_serveur     dcm1.opensourceinfra.ats dcm1
+```
 
-            entrer la ligne suivante:
+Installation de Samba DC (dans notre cas, nous travaillerons avec Ubuntu Server 20.04 LTS).
 
-            ip_du_serveur     dcm1.opensourceinfra.ats dcm1
+```bash
+sudo apt install samba smbclient winbind libpam-winbind libnss-winbind krb5-kdc libpam-krb5 -y
+```
 
-      Installation de samba dc (dans notre cas nous travaillerons avec Ubuntu Server 20.04 LTS)
+Répondre aux questions, valider toutes les questions par Entrée. Nous compléterons ces champs lorsque nous allons promouvoir AD.
 
-            sudo apt install samba smbclient winbind libpam-winbind libnss-winbind krb5-kdc libpam-krb5 -y
+## Configurer Samba comme contrôleur AD
 
+Copie des anciennes configurations avant de passer aux configurations :
 
-
-repondre au question
-
-OPENSOURCEINFRA.ATS
-
-
-Configuring Kerberos Authentication Kerberos servers for your realm:
-
+```bash
 sudo cp /etc/samba/smb.conf /etc/samba/smb.conf.bak
-
 sudo cp /etc/krb5.conf /etc/krb5.conf.bak
+```
 
+Suppression des anciennes configurations :
 
+```bash
 sudo systemctl stop smbd nmbd winbind
 sudo rm -rf /var/lib/samba/*
 sudo rm -rf /etc/samba/smb.conf
+```
 
+Promouvoir Samba DC :
 
- samba-tool domain provision --server-role=dc --use-rfc2307 --dns-backend=SAMBA_INTERNAL --realm=OPENSOURCEINFRA.ATS --domain=OPENSOURCEINFRA --adminpass=P@ssw0rd@
+En mode interactif :
 
+```bash
+sudo samba-tool domain provision --use-rfc2307 --interactive
+```
+
+Nous allons préférer le mode non interactif :
+
+```bash
+samba-tool domain provision --server-role=dc --use-rfc2307 --dns-backend=SAMBA_INTERNAL --realm=OPENSOURCEINFRA.ATS --domain=OPENSOURCEINFRA --adminpass='P@ssw0rd@'
+```
 
 ![alt text](prov.png)
 
+Définir dans /etc/samba/smb.conf le DNS forwarder dans la section [global] par 8.8.8.8 ou 1.1.1.1 ou encore IP du serveur DNS.
 
+![alt text](for.png)
+
+Pour démarrer Samba au démarrage du serveur :
+
+```bash
 sudo systemctl unmask samba-ad-dc
 sudo systemctl enable samba-ad-dc
 sudo systemctl start samba-ad-dc
+```
 
+Éditer et désactiver systemd-resolved pour éviter qu'il écrase resolv.conf :
 
+Éditer dans le fichier /etc/resolv.conf :
+
+```text
+nameserver 192.168.1.93
+search OPENSOURCEINFRA
+```
+
+Désactiver :
+
+```bash
+sudo systemctl disable systemd-resolved
+sudo systemctl stop systemd-resolved
+```
+
+```bash
 sudo cp /var/lib/samba/private/krb5.conf /etc
+```
 
+Testons la configuration.
 
+L'enregistrement SRV _ldap :
 
+```bash
+host -t SRV _ldap._tcp.opensourceinfra.ats
+```
 
+L'enregistrement de ressource SRV _kerberos basé sur UDP dans le domaine :
+
+```bash
+host -t SRV _kerberos._udp.opensourceinfra.ats
+host -t A dcm1.opensourceinfra.ats
+```
+
+## Kerberos
+
+```bash
+kinit administrator@OPENSOURCEINFRA.ATS
+```
+
+Résultat :
+
+```text
+Password for administrator@OPENSOURCEINFRA.ATS:
+Warning: Your password will expire in 41 days on Fri May 1 15:19:13 2026
+```
+
+```bash
+klist
+```
+
+Résultat :
+
+```text
+Ticket cache: FILE:/tmp/krb5cc_1000
+Default principal: administrator@OPENSOURCEINFRA.ATS
+
+Valid starting     Expires            Service principal
+03/20/26 15:53:54  03/21/26 01:53:54  krbtgt/OPENSOURCEINFRA.ATS@OPENSOURCEINFRA.ATS
+renew until 03/21/26 15:53:27
+```
+
+Créons le compte administrateur du domaine :
+
+```bash
+kinit Administrator
+```
+
+Testons la connectivité avec le compte administrator :
+
+```bash
+smbclient //localhost/netlogon -UAdministrator -c 'ls'
+```
+
+Créons un compte utilisateur simple :
+
+- Créer l'utilisateur en mode interactif :
+
+```bash
+sudo samba-tool user create username
+```
+
+- Créer avec mot de passe directement :
+
+```bash
+sudo samba-tool user create tchamie Passw0rd123@
+```
